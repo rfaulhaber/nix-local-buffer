@@ -1,2 +1,2 @@
-# nix-buffer
-Execute buffer-local nix shells.
+# nix-local-buffer
+Execute buffer-local Nix environments.

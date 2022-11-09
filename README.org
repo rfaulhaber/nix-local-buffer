@@ -1,0 +1,17 @@
+#+title: nix-local-buffer
+
+Execute buffer-local Nix environments.
+
+* Usage
+This package provides one interactive function, =nix-local-buffer=.
+
+You will be prompted for a flake (defaults to =nixpkgs=) and a list of packages.
+
+Specifying =nixpkgs= and =nodejs racket= will build =nixpkgs#nodejs= and
+=nixpkgs#racket= and make their =/bin= directories available in the buffer
+environment.
+* Why?
+1. I want ad-hoc buffer-local environments that don't use the old "nix-*" commands.
+2. I wanted to be able to run =quickrun= ad-hoc without making files.
+* Feature wishlist
+- Searchable options, accept multiple selections

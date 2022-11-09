@@ -4,8 +4,8 @@
 ;;
 ;; Author: Ryan Faulhaber <ryf@sent.as>
 ;; Maintainer: Ryan Faulhaber <ryf@sent.as>
-;; Created: August 08, 2022
-;; Modified: August 08, 2022
+;; Created: September 20, 2022
+;; Modified: September 20, 2022
 ;; Version: 0.0.1
 ;; Keywords: tools
 ;; Homepage: https://github.com/rfaulhaber/nix-local-buffer
@@ -22,7 +22,6 @@
 (require 'subr-x)
 
 ;; TODO optionally, run nix search, display list of packages
-;; TODO default to nixpkgs flake, but optionally allow for different flake
 
 (defgroup nix-local-buffer nil
   "Buffer-local Nix environments."
@@ -45,7 +44,8 @@ Set to nil to pass --no-link to nix build instead."
   :group 'nix-local-buffer
   :type '(string))
 
-(defun nix-local-buffer-get-output-links ()
+(defun nix-local-buffer--get-output-links ()
+  "Extracts output links from output buffer."
   (seq-map (lambda (path)
              (concat path "/bin"))
            (seq-filter (lambda (item)
@@ -54,23 +54,32 @@ Set to nil to pass --no-link to nix build instead."
                         (with-current-buffer nix-local-buffer-process-buffer-name
                           (buffer-string)) "\n"))))
 
-(defun nix-local-buffer-create-new-path (out-paths)
+(defun nix-local-buffer--create-new-path (out-paths)
+  "Create a new PATH variable based on OUT-PATHS."
   (let* ((path (parse-colon-path (getenv "PATH"))))
     (concat "PATH=" (string-join (append path out-paths) ":"))))
 
-(defun nix-local-buffer-build-sentinel (process event)
-  (message "process: %s event %s" process event)
+(defun nix-local-buffer--build-sentinel (_process event)
+  "Sentinel for nix build process."
   (when (string-match-p "finished" event)
-    (let* ((output-links (nix-local-buffer-get-output-links))
-           (new-path (nix-local-buffer-create-new-path output-links)))
+    (let* ((output-links (nix-local-buffer--get-output-links))
+           (new-path (nix-local-buffer--create-new-path output-links)))
+      (message "output-links %s" output-links)
       (setq-local process-environment (append (seq-filter (lambda (item)
                                                             (not (string-match-p (rx bol "PATH=") item))) process-environment)
-                                              (list new-path)))
-      (setq-local exec-path (append (default-value 'exec-path) output-links))))
-  (kill-buffer nix-local-buffer-process-buffer-name))
+                                              (list new-path))
+                  exec-path (append exec-path output-links))))
+  (kill-buffer nix-local-buffer-process-buffer-name)
+  (when (featurep 'quickrun)
+    (quickrun--init-command-key-table))
+  (message "Packages have been added to the environment!"))
 
 ;;;###autoload
 (defun nix-local-buffer (flake pkgs)
+  "Generate an ephemeral Nix environment from the specified FLAKE#PKGS.
+This will modify the local buffer environment and make the executables within
+the packages installed available. This tries to be a buffer equivalent of 'nix
+shell'."
   (interactive
    (list
     (read-from-minibuffer "Flake? (Set to blank to manually specify) " nix-local-buffer-default-flake)
@@ -86,13 +95,12 @@ Set to nil to pass --no-link to nix build instead."
          (out-path-flag (if (null nix-local-buffer-directory-name)
                             '("--no-link")
                           `("--out-link" ,nix-local-buffer-directory-name))))
-    (message "%s" installable-list)
     (make-process
      :name "nix build"
      :buffer nix-local-buffer-process-buffer-name
      :command `("nix" "build" "--print-out-paths" ,@out-path-flag ,@installable-list)
      :noquery t
-     :sentinel #'nix-local-buffer-build-sentinel
+     :sentinel #'nix-local-buffer--build-sentinel
      :stderr (get-buffer-create nix-local-buffer-process-error-buffer-name))))
 
 (provide 'nix-local-buffer)

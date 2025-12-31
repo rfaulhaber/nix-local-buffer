@@ -5,7 +5,7 @@
 ;; Author: Ryan Faulhaber <ryf@sent.as>
 ;; Maintainer: Ryan Faulhaber <ryf@sent.as>
 ;; Created: September 20, 2022
-;; Modified: September 20, 2022
+;; Modified: December 31, 2025
 ;; Version: 0.0.1
 ;; Keywords: tools
 ;; Homepage: https://github.com/rfaulhaber/nix-local-buffer
@@ -36,7 +36,7 @@
   "Directory name to pass to --out-link.
 Set to nil to pass --no-link to nix build instead."
   :group 'nix-local-buffer
-  :type '(directory))
+  :type 'string)
 
 (defcustom nix-local-buffer-default-flake
   "nixpkgs"

@@ -14,10 +14,10 @@ environment.
 1. I want ad-hoc buffer-local environments that don't use the old "nix-*" commands.
 2. I wanted to be able to run =quickrun= ad-hoc without making files.
 * Why not...?
-** [[https://github.com/shlevy/nix-buffer][=nix-buffer=]]
+** [[https://github.com/shlevy/nix-buffer][nix-buffer]]
 I used to use =nix-buffer=. It's great. But =direnv= / =envrc= makes it
 superfluous.
-** [[https://github.com/purcell/envrc][=envrc=]]
+** [[https://github.com/purcell/envrc][envrc]]
 I actively use =envrc= and =direnv=. I am a big believer in the usefulness of
 =direnv= for projects. The problem is that I cannot use this for buffers that
 aren't associated to files.

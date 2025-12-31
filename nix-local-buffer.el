@@ -55,24 +55,41 @@ Set to nil to pass --no-link to nix build instead."
                           (buffer-string)) "\n"))))
 
 (defun nix-local-buffer--create-new-path (out-paths)
-  "Create a new PATH variable based on OUT-PATHS."
+  "Create a new PATH variable based on OUT-PATHS.
+OUT-PATHS are prepended to take precedence over existing paths."
   (let* ((path (parse-colon-path (getenv "PATH"))))
-    (concat "PATH=" (string-join (append path out-paths) ":"))))
+    (concat "PATH=" (string-join (append out-paths path) ":"))))
 
-(defun nix-local-buffer--build-sentinel (_process event)
-  "Sentinel for nix build process."
-  (when (string-match-p "finished" event)
-    (let* ((output-links (nix-local-buffer--get-output-links))
-           (new-path (nix-local-buffer--create-new-path output-links)))
-      (message "output-links %s" output-links)
-      (setq-local process-environment (append (seq-filter (lambda (item)
-                                                            (not (string-match-p (rx bol "PATH=") item))) process-environment)
-                                              (list new-path))
-                  exec-path (append exec-path output-links))))
-  (kill-buffer nix-local-buffer-process-buffer-name)
-  (when (featurep 'quickrun)
-    (quickrun--init-command-key-table))
-  (message "Packages have been added to the environment!"))
+(defun nix-local-buffer--make-sentinel (target-buffer)
+  "Create a sentinel that modifies TARGET-BUFFER's environment."
+  (lambda (_process event)
+    (cond
+     ((string-match-p "finished" event)
+      (let* ((output-links (nix-local-buffer--get-output-links))
+             (new-path (nix-local-buffer--create-new-path output-links)))
+        (when (buffer-live-p target-buffer)
+          (with-current-buffer target-buffer
+            (setq-local process-environment
+                        (append (seq-filter (lambda (item)
+                                              (not (string-match-p (rx bol "PATH=") item)))
+                                            process-environment)
+                                (list new-path))
+                        exec-path (append output-links exec-path))
+            (when (featurep 'quickrun)
+              (quickrun--init-command-key-table)))))
+      (when (get-buffer nix-local-buffer-process-buffer-name)
+        (kill-buffer nix-local-buffer-process-buffer-name))
+      (when (get-buffer nix-local-buffer-process-error-buffer-name)
+        (kill-buffer nix-local-buffer-process-error-buffer-name))
+      (message "nix-local-buffer: Packages added to environment!"))
+     ((string-match-p "\\(exited\\|failed\\|signal\\)" event)
+      (when (get-buffer nix-local-buffer-process-buffer-name)
+        (kill-buffer nix-local-buffer-process-buffer-name))
+      (let ((err-buffer (get-buffer nix-local-buffer-process-error-buffer-name)))
+        (when err-buffer
+          (pop-to-buffer err-buffer)))
+      (message "nix-local-buffer: Build failed! See %s for details."
+               nix-local-buffer-process-error-buffer-name)))))
 
 ;;;###autoload
 (defun nix-local-buffer (flake pkgs)
@@ -100,7 +117,7 @@ shell'."
      :buffer nix-local-buffer-process-buffer-name
      :command `("nix" "build" "--print-out-paths" ,@out-path-flag ,@installable-list)
      :noquery t
-     :sentinel #'nix-local-buffer--build-sentinel
+     :sentinel (nix-local-buffer--make-sentinel (current-buffer))
      :stderr (get-buffer-create nix-local-buffer-process-error-buffer-name))))
 
 (provide 'nix-local-buffer)
